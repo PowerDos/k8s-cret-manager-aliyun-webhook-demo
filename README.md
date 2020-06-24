@@ -3,7 +3,7 @@
 
 > 我们这里通过Helm安装cret-manager,**请注意查看k8s版本正确安装对应版本的应用**
 
-## 安装Helm 3
+## 1.安装Helm 3
 > 官方安装教程: https://helm.sh/docs/intro/install/
 
 ```
@@ -12,7 +12,7 @@ $ chmod 700 get_helm.sh
 $ ./get_helm.sh
 ```
 
-## 安装cert-manager
+## 2.安装cert-manager
 ### 前期准备
 #### 添加命名空间
 > kubectl create namespace cert-manager
@@ -52,7 +52,7 @@ cert-manager-cainjector-348f6d9fd7-tr77l   1/1     Running   0          2m
 cert-manager-webhook-893u48fcdb-nlzsq      1/1     Running   0          2m
 ```
 
-## 安装证书
+## 3.安装证书
 > 官方介绍这中 Issuer 与 ClusterIssuer 的概念：
 
 ```
@@ -136,3 +136,6 @@ spec:
           serviceName: kuard
           servicePort: 80
 ```
+
+## 4.通配符域名配置 - 阿里云webhook
+
