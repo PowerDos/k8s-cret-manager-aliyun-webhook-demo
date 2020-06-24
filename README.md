@@ -53,13 +53,13 @@ cert-manager-webhook-893u48fcdb-nlzsq      1/1     Running   0          2m
 ```
 
 ## 安装证书
-官方介绍这中 Issuer 与 ClusterIssuer 的概念：
+> 官方介绍这中 Issuer 与 ClusterIssuer 的概念：
 
 ```
 Issuers, and ClusterIssuers, are Kubernetes resources that represent certificate authorities (CAs) that are able to generate signed certificates by honoring certificate signing requests. All cert-manager certificates require a referenced issuer that is in a ready condition to attempt to honor the request.
 ```
 
-Issuer 与 ClusterIssuer 的区别是 ClusterIssuer 可跨命名空间使用，而 Issuer 需在每个命名空间下配置后才可使用。这里我们使用 ClusterIssuer，其类型选择 Let‘s Encrypt
+> Issuer 与 ClusterIssuer 的区别是 ClusterIssuer 可跨命名空间使用，而 Issuer 需在每个命名空间下配置后才可使用。这里我们使用 ClusterIssuer，其类型选择 Let‘s Encrypt
 
 > 测试证书
 ```
@@ -107,7 +107,8 @@ spec:
 ### 这里安装两个环境的证书的作用
 > 这里分别配置了测试环境与生产环境两个 ClusterIssuer， 原因是 Let’s Encrypt 的生产环境有着非常严格的接口调用限制，最好是在测试环境测试通过后，再切换为生产环境。生产环境和测试环境的区别：https://letsencrypt.org/zh-cn/docs/staging-environment/
 
-### 部署测试证书
+### 在Ingress中使用证书
+> 在ingress配置后，会自动生成证书
 
 ```
 apiVersion: extensions/v1beta1
