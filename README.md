@@ -137,5 +137,279 @@ spec:
           servicePort: 80
 ```
 
-## 4.通配符域名配置 - 阿里云webhook
+## 4.通过DNS配置通配符域名域名
+> 这里样式的是阿里云DNS操作的流程，如果需要其他平台的方法，可以自行开发，或者找已开源webhook，这是官方的例子：https://github.com/jetstack/cert-manager-webhook-example
 
+> 这里用的是这个包：https://github.com/pragkent/alidns-webhook
+
+### 安装WebHook
+> 不同cret-manager的安装办法不同
+#### cret-manager 版本大于等于v0.11
+##### 安装
+```
+# Install alidns-webhook to cert-manager namespace. 
+kubectl apply -f https://raw.githubusercontent.com/pragkent/alidns-webhook/master/deploy/bundle.yaml
+```
+##### 添加阿里云RAM账号
+> 子账号需要开通HTTPS管理权限(AliyunDNSFullAccess,管理云解析（DNS）的权限)
+```
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alidns-secret
+  namespace: cert-manager
+data:
+  access-key: YOUR_ACCESS_KEY # 需要先base64加密
+  secret-key: YOUR_SECRET_KEY # 需要先base64加密
+```
+
+##### 创建ClusterIssuer
+
+> 测试证书申请
+```
+apiVersion: cert-manager.io/v1alpha2
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging-dns
+spec:
+  acme:
+    email: gavin.tech@qq.com
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-staging-dns
+    solvers:
+    - dns01:
+        webhook:
+          groupName: acme.yourcompany.com # 注意这里要改动，在https://raw.githubusercontent.com/pragkent/alidns-webhook/master/deploy/bundle.yaml中也要改动对应的groupName
+          solverName: alidns
+          config:
+            region: ""
+            accessKeySecretRef:
+              name: alidns-secret
+              key: access-key
+            secretKeySecretRef:
+              name: alidns-secret
+              key: secret-key
+```
+
+> 正式证书申请
+```
+apiVersion: cert-manager.io/v1alpha2
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod-dns
+spec:
+  acme:
+    email: gavin.tech@qq.com
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-prod-dns
+    solvers:
+    - dns01:
+        webhook:
+          groupName: acme.yourcompany.com
+          solverName: alidns
+          config:
+            region: "" # 这里可以不填 或者填对应的区域:cn-shenzhen
+            accessKeySecretRef:
+              name: alidns-secret
+              key: access-key
+            secretKeySecretRef:
+              name: alidns-secret
+              key: secret-key
+```
+
+##### 创建Certificate
+> 测试证书
+```
+apiVersion: cert-manager.io/v1alpha2
+kind: Certificate
+metadata:
+  name: ditigram-com-staging-tls
+spec:
+  secretName: ditigram-com-staging-tls
+  commonName: ditigram.com
+  dnsNames:
+  - ditigram.com
+  - "*.ditigram.com"
+  issuerRef:
+    name: letsencrypt-staging-dns
+    kind: ClusterIssuer
+```
+
+> 正式证书
+```
+apiVersion: cert-manager.io/v1alpha2
+kind: Certificate
+metadata:
+  name: ditigram-com-prod-tls
+spec:
+  secretName: ditigram-com-prod-tls
+  commonName: ditigram.com
+  dnsNames:
+  - ditigram.com
+  - "*.ditigram.com"
+  issuerRef:
+    name: letsencrypt-prod-dns
+    kind: ClusterIssuer
+```
+
+##### 在Ingress中应用
+```
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: kuard
+  annotations:
+    # 务必添加以下两个注解, 指定 ingress 类型及使用哪个 cluster-issuer
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer："letsencrypt-staging-dns" # 这里先用测试环境的证书测通后，就可以替换成正式服证书
+spec:
+  tls:
+  - hosts:
+    - "*.ditigram.com"                     # 如果填写单域名就只会生产单域名的证书，如果是通配符请填写"*.example.com", 注意：如果填写example.com只会生成www.example.com一个域名。
+    secretName: ditigram-com-staging-tls   # 测试的证书，填写刚刚创建Certificate的名称，注意更换环境时证书也要一起更换，这里并不会像单域名一样自动生成
+  rules:
+  - host: example.ditigram.com
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: kuard
+          servicePort: 80
+```
+
+#### cret-manager 版本小于v0.11
+##### 安装
+```
+# Install alidns-webhook to cert-manager namespace. 
+kubectl apply -f https://raw.githubusercontent.com/pragkent/alidns-webhook/master/deploy/legacy.yaml
+```
+##### 添加阿里云RAM账号
+> 子账号需要开通HTTPS管理权限(AliyunDNSFullAccess,管理云解析（DNS）的权限)
+```
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alidns-secret
+  namespace: cert-manager
+data:
+  access-key: YOUR_ACCESS_KEY # 需要先base64加密
+  secret-key: YOUR_SECRET_KEY # 需要先base64加密
+```
+
+##### 创建ClusterIssuer
+
+> 测试证书申请
+```
+apiVersion: certmanager.k8s.io/v1alpha1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging-dns
+spec:
+  acme:
+    email: gavin.tech@qq.com
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-staging-dns
+    solvers:
+    - dns01:
+        webhook:
+          groupName: acme.yourcompany.com # 注意这里要改动，在https://raw.githubusercontent.com/pragkent/alidns-webhook/master/deploy/bundle.yaml中也要改动对应的groupName
+          solverName: alidns
+          config:
+            region: ""
+            accessKeySecretRef:
+              name: alidns-secret
+              key: access-key
+            secretKeySecretRef:
+              name: alidns-secret
+              key: secret-key
+```
+
+> 正式证书申请
+```
+apiVersion: certmanager.k8s.io/v1alpha1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod-dns
+spec:
+  acme:
+    email: gavin.tech@qq.com
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-prod-dns
+    solvers:
+    - dns01:
+        webhook:
+          groupName: acme.yourcompany.com
+          solverName: alidns
+          config:
+            region: "" # 这里可以不填 或者填对应的区域:cn-shenzhen
+            accessKeySecretRef:
+              name: alidns-secret
+              key: access-key
+            secretKeySecretRef:
+              name: alidns-secret
+              key: secret-key
+```
+
+##### 创建Certificate
+> 测试证书
+```
+apiVersion: certmanager.k8s.io/v1alpha1
+kind: Certificate
+metadata:
+  name: ditigram-com-staging-tls
+spec:
+  secretName: ditigram-com-staging-tls
+  commonName: ditigram.com
+  dnsNames:
+  - ditigram.com
+  - "*.ditigram.com"
+  issuerRef:
+    name: letsencrypt-staging-dns
+    kind: ClusterIssuer
+```
+
+> 正式证书
+```
+apiVersion: certmanager.k8s.io/v1alpha1
+kind: Certificate
+metadata:
+  name: ditigram-com-prod-tls
+spec:
+  secretName: ditigram-com-prod-tls
+  commonName: ditigram.com
+  dnsNames:
+  - ditigram.com
+  - "*.ditigram.com"
+  issuerRef:
+    name: letsencrypt-prod-dns
+    kind: ClusterIssuer
+```
+
+##### 在Ingress中应用
+```
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: kuard
+  annotations:
+    # 务必添加以下两个注解, 指定 ingress 类型及使用哪个 cluster-issuer
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer："letsencrypt-staging-dns" # 这里先用测试环境的证书测通后，就可以替换成正式服证书
+spec:
+  tls:
+  - hosts:
+    - "*.ditigram.com"                     # 如果填写单域名就只会生产单域名的证书，如果是通配符请填写"*.example.com", 注意：如果填写example.com只会生成www.example.com一个域名。
+    secretName: ditigram-com-staging-tls   # 测试的证书，填写刚刚创建Certificate的名称，注意更换环境时证书也要一起更换，这里并不会像单域名一样自动生成
+  rules:
+  - host: example.ditigram.com
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: kuard
+          servicePort: 80
+```
